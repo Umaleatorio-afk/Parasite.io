@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Parasite.io UPGRADE</title>
+
+<style>
+body{
+margin:0;
+overflow:hidden;
+font-family:Arial;
+background:#5aa657;
+}
+
+#menu{
+position:absolute;
+width:100%;
+height:100%;
+background:#2e7d32;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+color:white;
+}
+
+button{
+padding:10px;
+margin:10px;
+font-size:18px;
+}
+
+#game{
+display:none;
+position:absolute;
+width:3000px;
+height:3000px;
+background:#6fcf70;
+}
+
+.parasite{
+position:absolute;
+border-radius:50%;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.eye{
+width:12px;
+height:12px;
+background:white;
+border-radius:50%;
+margin:2px;
+display:flex;
+align-items:center;
+justify-content:center;
+}
+
+.pupil{
+width:6px;
+height:6px;
+background:black;
+border-radius:50%;
+}
+
+.food{
+width:10px;
+height:10px;
+background:yellow;
+position:absolute;
+border-radius:50%;
+}
+
+#rank{
+position:fixed;
+top:10px;
+right:10px;
+color:white;
+background:rgba(0,0,0,0.5);
+padding:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+<h1>Parasite.io</h1>
+<input type="color" id="colorPicker" value="#00ff00">
+<button onclick="startGame()">Jogar</button>
+</div>
+
+<div id="game"></div>
+<div id="rank"></div>
+
+<script>
+let game = document.getElementById("game");
+let player;
+let bots = [];
+let foods = [];
+
+let mapSize = 3000;
+let size = 30;
+let maxSize = 500;
+
+let x = 1500;
+let y = 1500;
+
+let targetX = x;
+let targetY = y;
+
+function createParasite(color){
+let div = document.createElement("div");
+div.className = "parasite";
+div.style.background = color;
+
+let eye1 = document.createElement("div");
+eye1.className = "eye";
+let pupil1 = document.createElement("div");
+pupil1.className = "pupil";
+
+let eye2 = document.createElement("div");
+eye2.className = "eye";
+let pupil2 = document.createElement("div");
+pupil2.className = "pupil";
+
+eye1.appendChild(pupil1);
+eye2.appendChild(pupil2);
+
+div.appendChild(eye1);
+div.appendChild(eye2);
+
+game.appendChild(div);
+
+div.size = 30;
+div.x = Math.random()*mapSize;
+div.y = Math.random()*mapSize;
+
+return div;
+}
+
+function spawnFood(){
+let food = document.createElement("div");
+food.className = "food";
+food.x = Math.random()*mapSize;
+food.y = Math.random()*mapSize;
+game.appendChild(food);
+foods.push(food);
+}
+
+function startGame(){
+document.getElementById("menu").style.display="none";
+game.style.display="block";
+
+player = createParasite(document.getElementById("colorPicker").value);
+
+for(let i=0;i<20;i++){
+let bot = createParasite("red");
+bots.push(bot);
+}
+
+for(let i=0;i<100;i++){
+spawnFood();
+}
+}
+
+document.addEventListener("mousemove", e=>{
+targetX = e.clientX;
+targetY = e.clientY;
+});
+
+document.addEventListener("touchmove", e=>{
+targetX = e.touches[0].clientX;
+targetY = e.touches[0].clientY;
+});
+
+function updateEyes(entity, dx, dy){
+let pupils = entity.querySelectorAll(".pupil");
+pupils.forEach(p=>{
+p.style.transform = `translate(${dx*2}px, ${dy*2}px)`;
+});
+}
+
+function loop(){
+
+let dx = (targetX - window.innerWidth/2)/100;
+let dy = (targetY - window.innerHeight/2)/100;
+
+x += dx * 10;
+y += dy * 10;
+
+if(x < 0 || y < 0 || x > mapSize || y > mapSize){
+alert("Você morreu!");
+location.reload();
+}
+
+player.x = x;
+player.y = y;
+
+player.style.width = size+"px";
+player.style.height = size+"px";
+player.style.left = x+"px";
+player.style.top = y+"px";
+
+updateEyes(player, dx, dy);
+
+game.style.transform = `translate(${-x + window.innerWidth/2}px, ${-y + window.innerHeight/2}px)`;
+
+/* comida */
+foods.forEach((food,i)=>{
+food.style.left = food.x+"px";
+food.style.top = food.y+"px";
+
+let dist = Math.hypot(food.x-x, food.y-y);
+if(dist < size){
+food.remove();
+foods.splice(i,1);
+
+if(size < maxSize){
+size += 2;
+}
+spawnFood();
+}
+});
+
+/* bots */
+bots.forEach(bot=>{
+let dx = x - bot.x;
+let dy = y - bot.y;
+
+let dist = Math.hypot(dx,dy);
+
+bot.x += dx/dist * 2;
+bot.y += dy/dist * 2;
+
+bot.style.width = bot.size+"px";
+bot.style.height = bot.size+"px";
+bot.style.left = bot.x+"px";
+bot.style.top = bot.y+"px";
+
+updateEyes(bot, dx/50, dy/50);
+
+if(dist < size){
+if(size >= bot.size){
+bot.remove();
+bot.x = Math.random()*mapSize;
+bot.y = Math.random()*mapSize;
+bot.size = 30;
+game.appendChild(bot);
+
+if(size < maxSize){
+size += 10;
+}
+}
+}
+});
+
+/* ranking fake */
+document.getElementById("rank").innerText =
+"Tamanho: " + size;
+
+requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+
+</body>
+</html>
