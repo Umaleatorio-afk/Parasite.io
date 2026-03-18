@@ -1,100 +1,132 @@
 <!DOCTYPE html><html>
 <head>
 <meta charset="UTF-8">
-<title>Parasite.io OFFLINE PRO</title><style>
-body{
-margin:0;
-overflow:hidden;
-background:#3fa34d;
+<title>Parasite.io PRO MAX</title><style>
+body{margin:0;overflow:hidden;font-family:Arial;background:#2e7d32;}
+
+#menu{
+position:absolute;width:100%;height:100%;
+display:flex;flex-direction:column;align-items:center;justify-content:center;
+color:white;
 }
 
-/* GAME */
+button,input{padding:10px;margin:5px;border:none;border-radius:10px;}
+
 #game{
+display:none;
 position:absolute;
-width:4000px;
-height:4000px;
-background:
-repeating-linear-gradient(
-45deg,
-#3fa34d,
-#3fa34d 20px,
-#45b35a 20px,
-#45b35a 40px
-);
+width:4000px;height:4000px;
+background:repeating-linear-gradient(45deg,#3fa34d,#3fa34d 20px,#45b35a 20px,#45b35a 40px);
 }
 
-.parasite{
+.segment{
 position:absolute;
 border-radius:50%;
-display:flex;
-justify-content:center;
-align-items:center;
-}
-
-.eye{
-width:6px;
-height:6px;
-background:white;
-border-radius:50%;
-margin:2px;
 }
 
 .food{
 position:absolute;
-width:8px;
-height:8px;
-background:yellow;
-border-radius:50%;
+width:8px;height:8px;background:yellow;border-radius:50%;
 }
 
-</style></head><body><div id="game"></div><script>
-let game=document.getElementById("game");
+.wall{
+position:absolute;
+background:black;
+}
 
-let player={x:2000,y:2000,size:30};
+#ui{
+position:fixed;top:10px;left:10px;color:white;
+background:rgba(0,0,0,0.5);padding:10px;border-radius:10px;
+}
+
+#joystick{
+position:fixed;
+bottom:30px;left:30px;
+width:100px;height:100px;
+background:rgba(255,255,255,0.2);
+border-radius:50%;
+display:none;
+}
+</style></head><body><div id="menu">
+<h1>Parasite.io</h1>
+<input id="nick" placeholder="Nick">
+<input type="color" id="color" value="#00ff00">
+<button onclick="start()">Jogar</button>
+</div><div id="game"></div>
+<div id="ui"></div>
+<div id="joystick"></div><script>
+let game=document.getElementById("game");
+let ui=document.getElementById("ui");
+let joystick=document.getElementById("joystick");
+
+let player={x:2000,y:2000,size:10,color:"#00ff00"};
+let segments=[];
 let bots=[];
 let foods=[];
+let keys={};
 
-let tx=2000,ty=2000;
+/* CONTROLES PC */
+document.addEventListener("keydown",e=>keys[e.key]=true);
+document.addEventListener("keyup",e=>keys[e.key]=false);
 
-/* CONTROLES */
-document.addEventListener("mousemove",e=>{
-tx=player.x+(e.clientX-window.innerWidth/2);
-ty=player.y+(e.clientY-window.innerHeight/2);
+/* MOBILE */
+let joyX=0,joyY=0;
+joystick.addEventListener("touchmove",e=>{
+let t=e.touches[0];
+joyX=(t.clientX-80)/50;
+joyY=(t.clientY-80)/50;
 });
 
-document.addEventListener("touchmove",e=>{
-tx=player.x+(e.touches[0].clientX-window.innerWidth/2);
-ty=player.y+(e.touches[0].clientY-window.innerHeight/2);
-});
+/* START */
+function start(){
+document.getElementById("menu").style.display="none";
+game.style.display="block";
 
-/* CRIAR BOTS */
-for(let i=0;i<15;i++){
+player.color=document.getElementById("color").value;
+
+/* joystick mobile */
+if("ontouchstart" in window){
+joystick.style.display="block";
+}
+
+/* spawn bots */
+for(let i=0;i<10;i++){
 bots.push({
 x:Math.random()*4000,
 y:Math.random()*4000,
-size:20+Math.random()*20
+size:10+Math.random()*20
 });
 }
 
-/* COMIDA */
-function spawnFood(){
+/* comida */
 for(let i=0;i<200;i++){
-foods.push({
-x:Math.random()*4000,
-y:Math.random()*4000
-});
+foods.push({x:Math.random()*4000,y:Math.random()*4000});
 }
 }
-spawnFood();
 
 /* LOOP */
 function loop(){
 
-let dx=(tx-player.x)/50;
-let dy=(ty-player.y)/50;
+/* MOVIMENTO */
+let speed=3;
+let dx=0,dy=0;
 
-player.x+=dx;
-player.y+=dy;
+if(keys["w"]||keys["ArrowUp"]) dy-=1;
+if(keys["s"]||keys["ArrowDown"]) dy+=1;
+if(keys["a"]||keys["ArrowLeft"]) dx-=1;
+if(keys["d"]||keys["ArrowRight"]) dx+=1;
+
+/* mobile */
+dx+=joyX;
+dy+=joyY;
+
+player.x+=dx*speed;
+player.y+=dy*speed;
+
+/* parede */
+if(player.x<0||player.y<0||player.x>4000||player.y>4000){
+die();
+}
 
 /* COMER */
 foods.forEach((f,i)=>{
@@ -102,8 +134,13 @@ let d=Math.hypot(f.x-player.x,f.y-player.y);
 if(d<player.size){
 foods.splice(i,1);
 player.size+=1;
+segments.push({x:player.x,y:player.y});
 }
 });
+
+/* SEGMENTOS */
+segments.unshift({x:player.x,y:player.y});
+segments.splice(player.size);
 
 /* BOTS */
 bots.forEach(b=>{
@@ -111,26 +148,23 @@ let dx=player.x-b.x;
 let dy=player.y-b.y;
 let dist=Math.hypot(dx,dy);
 
-/* IA simples */
-if(b.size < player.size){
-b.x -= dx/dist*1.5;
-b.y -= dy/dist*1.5;
+if(b.size<player.size){
+b.x-=dx/dist*1.5;
+b.y-=dy/dist*1.5;
 }else{
-b.x += dx/dist*1.5;
-b.y += dy/dist*1.5;
+b.x+=dx/dist*1.5;
+b.y+=dy/dist*1.5;
 }
 
-/* morrer */
-if(dist < player.size && b.size > player.size){
-alert("Você morreu!");
-location.reload();
+if(dist<player.size && b.size>player.size){
+die();
 }
 });
 
 /* DESENHAR */
 game.innerHTML="";
 
-/* COMIDA */
+/* comida */
 foods.forEach(f=>{
 let d=document.createElement("div");
 d.className="food";
@@ -139,27 +173,22 @@ d.style.top=f.y+"px";
 game.appendChild(d);
 });
 
-/* PLAYER */
-let p=document.createElement("div");
-p.className="parasite";
-p.style.left=player.x+"px";
-p.style.top=player.y+"px";
-p.style.width=player.size+"px";
-p.style.height=player.size+"px";
-p.style.background="lime";
+/* player corpo */
+segments.forEach(s=>{
+let d=document.createElement("div");
+d.className="segment";
+d.style.left=s.x+"px";
+d.style.top=s.y+"px";
+d.style.width=player.size+"px";
+d.style.height=player.size+"px";
+d.style.background=player.color;
+game.appendChild(d);
+});
 
-for(let i=0;i<2;i++){
-let e=document.createElement("div");
-e.className="eye";
-p.appendChild(e);
-}
-
-game.appendChild(p);
-
-/* BOTS */
+/* bots */
 bots.forEach(b=>{
 let d=document.createElement("div");
-d.className="parasite";
+d.className="segment";
 d.style.left=b.x+"px";
 d.style.top=b.y+"px";
 d.style.width=b.size+"px";
@@ -168,15 +197,20 @@ d.style.background="red";
 game.appendChild(d);
 });
 
-/* CAMERA + ZOOM */
-let zoom = 1 + (player.size/200);
+/* CAMERA */
+game.style.transform=
+`translate(${-player.x+window.innerWidth/2}px,${-player.y+window.innerHeight/2}px)`;
 
-game.style.transform = `
-translate(${-player.x+window.innerWidth/2}px,${-player.y+window.innerHeight/2}px)
-scale(${1/zoom})
-`;
+/* RANKING */
+let ranking=[...bots,{size:player.size}].sort((a,b)=>b.size-a.size);
+ui.innerText="Top 1: "+ranking[0].size+" | Seu: "+player.size;
 
 requestAnimationFrame(loop);
+}
+
+function die(){
+alert("Você morreu!");
+location.reload();
 }
 
 loop();
