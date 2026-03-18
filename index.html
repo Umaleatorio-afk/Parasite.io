@@ -1,56 +1,26 @@
 <!DOCTYPE html><html>
 <head>
 <meta charset="UTF-8">
-<title>Parasite.io PRO</title><style>
+<title>Parasite.io OFFLINE PRO</title><style>
 body{
 margin:0;
 overflow:hidden;
-font-family:Arial;
-background:#2e7d32;
-}
-
-/* MENU */
-#menu{
-position:absolute;
-width:100%;
-height:100%;
-display:flex;
-flex-direction:column;
-align-items:center;
-justify-content:center;
-color:white;
-}
-
-.title{
-font-size:50px;
-text-shadow:0 0 20px black;
-}
-
-.box{
-background:rgba(0,0,0,0.5);
-padding:20px;
-border-radius:20px;
-}
-
-input,button{
-margin:5px;
-padding:10px;
-border:none;
-border-radius:10px;
-}
-
-button{
-background:#00e676;
+background:#3fa34d;
 }
 
 /* GAME */
 #game{
-display:none;
 position:absolute;
 width:4000px;
 height:4000px;
-background:url("https://i.imgur.com/8QZ7Z6R.png");
-background-size:200px;
+background:
+repeating-linear-gradient(
+45deg,
+#3fa34d,
+#3fa34d 20px,
+#45b35a 20px,
+#45b35a 40px
+);
 }
 
 .parasite{
@@ -62,8 +32,8 @@ align-items:center;
 }
 
 .eye{
-width:8px;
-height:8px;
+width:6px;
+height:6px;
 background:white;
 border-radius:50%;
 margin:2px;
@@ -71,67 +41,40 @@ margin:2px;
 
 .food{
 position:absolute;
-width:10px;
-height:10px;
+width:8px;
+height:8px;
 background:yellow;
 border-radius:50%;
 }
 
-/* UI */
-#ui{
-position:fixed;
-top:10px;
-left:10px;
-color:white;
-background:rgba(0,0,0,0.5);
-padding:10px;
-border-radius:10px;
-}
-</style></head><body><div id="menu">
-<div class="title">Parasite.io</div>
-<div class="box">
-<input id="nick" placeholder="Nickname">
-<input type="color" id="color" value="#00ff00">
-<button onclick="start()">Jogar Online</button>
-</div>
-</div><div id="game"></div>
-<div id="ui"></div><script>
-let ws;
+</style></head><body><div id="game"></div><script>
+let game=document.getElementById("game");
+
 let player={x:2000,y:2000,size:30};
-let others={};
+let bots=[];
 let foods=[];
 
-function start(){
-
-document.getElementById("menu").style.display="none";
-document.getElementById("game").style.display="block";
-
-ws = new WebSocket("COLE_AQUI_SEU_LINK");
-
-ws.onmessage = (msg)=>{
-let data = JSON.parse(msg.data);
-
-if(data.type==="players"){
-others = data.players;
-}
-};
-
-spawnFood();
-loop();
-}
+let tx=2000,ty=2000;
 
 /* CONTROLES */
-let tx=0,ty=0;
-
 document.addEventListener("mousemove",e=>{
-tx=e.clientX;
-ty=e.clientY;
+tx=player.x+(e.clientX-window.innerWidth/2);
+ty=player.y+(e.clientY-window.innerHeight/2);
 });
 
 document.addEventListener("touchmove",e=>{
-tx=e.touches[0].clientX;
-ty=e.touches[0].clientY;
+tx=player.x+(e.touches[0].clientX-window.innerWidth/2);
+ty=player.y+(e.touches[0].clientY-window.innerHeight/2);
 });
+
+/* CRIAR BOTS */
+for(let i=0;i<15;i++){
+bots.push({
+x:Math.random()*4000,
+y:Math.random()*4000,
+size:20+Math.random()*20
+});
+}
 
 /* COMIDA */
 function spawnFood(){
@@ -142,21 +85,16 @@ y:Math.random()*4000
 });
 }
 }
+spawnFood();
 
 /* LOOP */
 function loop(){
 
-let dx=(tx-window.innerWidth/2)/50;
-let dy=(ty-window.innerHeight/2)/50;
+let dx=(tx-player.x)/50;
+let dy=(ty-player.y)/50;
 
 player.x+=dx;
 player.y+=dy;
-
-/* MORTE BORDA */
-if(player.x<0||player.y<0||player.x>4000||player.y>4000){
-alert("Você morreu!");
-location.reload();
-}
 
 /* COMER */
 foods.forEach((f,i)=>{
@@ -167,20 +105,32 @@ player.size+=1;
 }
 });
 
-/* ENVIAR SERVER */
-ws.send(JSON.stringify({
-type:"update",
-x:player.x,
-y:player.y,
-size:player.size,
-color:document.getElementById("color").value,
-nick:document.getElementById("nick").value
-}));
+/* BOTS */
+bots.forEach(b=>{
+let dx=player.x-b.x;
+let dy=player.y-b.y;
+let dist=Math.hypot(dx,dy);
 
-let game=document.getElementById("game");
+/* IA simples */
+if(b.size < player.size){
+b.x -= dx/dist*1.5;
+b.y -= dy/dist*1.5;
+}else{
+b.x += dx/dist*1.5;
+b.y += dy/dist*1.5;
+}
+
+/* morrer */
+if(dist < player.size && b.size > player.size){
+alert("Você morreu!");
+location.reload();
+}
+});
+
+/* DESENHAR */
 game.innerHTML="";
 
-/* DESENHAR COMIDA */
+/* COMIDA */
 foods.forEach(f=>{
 let d=document.createElement("div");
 d.className="food";
@@ -189,42 +139,46 @@ d.style.top=f.y+"px";
 game.appendChild(d);
 });
 
-/* DESENHAR PLAYERS */
-for(let id in others){
-let p=others[id];
+/* PLAYER */
+let p=document.createElement("div");
+p.className="parasite";
+p.style.left=player.x+"px";
+p.style.top=player.y+"px";
+p.style.width=player.size+"px";
+p.style.height=player.size+"px";
+p.style.background="lime";
 
+for(let i=0;i<2;i++){
+let e=document.createElement("div");
+e.className="eye";
+p.appendChild(e);
+}
+
+game.appendChild(p);
+
+/* BOTS */
+bots.forEach(b=>{
 let d=document.createElement("div");
 d.className="parasite";
-d.style.left=p.x+"px";
-d.style.top=p.y+"px";
-d.style.width=p.size+"px";
-d.style.height=p.size+"px";
-d.style.background=p.color;
-
-/* OLHOS */
-for(let i=0;i<2;i++){
-let eye=document.createElement("div");
-eye.className="eye";
-d.appendChild(eye);
-}
-
+d.style.left=b.x+"px";
+d.style.top=b.y+"px";
+d.style.width=b.size+"px";
+d.style.height=b.size+"px";
+d.style.background="red";
 game.appendChild(d);
+});
 
-/* COLISÃO */
-let dist=Math.hypot(p.x-player.x,p.y-player.y);
-if(dist<player.size && p.size>player.size){
-alert("Você foi comido!");
-location.reload();
-}
-}
+/* CAMERA + ZOOM */
+let zoom = 1 + (player.size/200);
 
-/* CAMERA */
-game.style.transform=`translate(${-player.x+window.innerWidth/2}px,${-player.y+window.innerHeight/2}px)`;
-
-/* UI */
-document.getElementById("ui").innerText="Tamanho: "+player.size;
+game.style.transform = `
+translate(${-player.x+window.innerWidth/2}px,${-player.y+window.innerHeight/2}px)
+scale(${1/zoom})
+`;
 
 requestAnimationFrame(loop);
 }
+
+loop();
 </script></body>
 </html>
