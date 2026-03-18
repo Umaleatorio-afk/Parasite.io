@@ -2,7 +2,7 @@
 <head>
 <meta charset="UTF-8">
 <title>Parasite.io PRO MAX</title><style>
-body{margin:0;overflow:hidden;font-family:Arial;background:#2e7d32;}
+body{margin:0;overflow:hidden;background:#2e7d32;font-family:Arial;}
 
 #menu{
 position:absolute;width:100%;height:100%;
@@ -29,37 +29,41 @@ position:absolute;
 width:8px;height:8px;background:yellow;border-radius:50%;
 }
 
-.wall{
-position:absolute;
-background:black;
-}
-
-#ui{
-position:fixed;top:10px;left:10px;color:white;
-background:rgba(0,0,0,0.5);padding:10px;border-radius:10px;
-}
-
-#joystick{
+/* JOYSTICK PRO */
+#joystickBase{
 position:fixed;
 bottom:30px;left:30px;
-width:100px;height:100px;
+width:120px;height:120px;
 background:rgba(255,255,255,0.2);
 border-radius:50%;
 display:none;
+}
+
+#joystickStick{
+position:absolute;
+width:60px;height:60px;
+background:rgba(255,255,255,0.5);
+border-radius:50%;
+top:30px;left:30px;
+}
+
+#ui{
+position:fixed;top:10px;left:10px;
+color:white;background:rgba(0,0,0,0.5);
+padding:10px;border-radius:10px;
 }
 </style></head><body><div id="menu">
 <h1>Parasite.io</h1>
 <input id="nick" placeholder="Nick">
 <input type="color" id="color" value="#00ff00">
 <button onclick="start()">Jogar</button>
-</div><div id="game"></div>
-<div id="ui"></div>
-<div id="joystick"></div><script>
+</div><div id="game"></div><div id="joystickBase">
+<div id="joystickStick"></div>
+</div><div id="ui"></div><script>
 let game=document.getElementById("game");
 let ui=document.getElementById("ui");
-let joystick=document.getElementById("joystick");
 
-let player={x:2000,y:2000,size:10,color:"#00ff00"};
+let player={x:2000,y:2000,size:15,color:"#00ff00"};
 let segments=[];
 let bots=[];
 let foods=[];
@@ -69,12 +73,46 @@ let keys={};
 document.addEventListener("keydown",e=>keys[e.key]=true);
 document.addEventListener("keyup",e=>keys[e.key]=false);
 
-/* MOBILE */
-let joyX=0,joyY=0;
-joystick.addEventListener("touchmove",e=>{
+/* JOYSTICK PRO */
+let joyX=0, joyY=0;
+let base=document.getElementById("joystickBase");
+let stick=document.getElementById("joystickStick");
+
+let touching=false;
+
+base.addEventListener("touchstart",e=>{
+touching=true;
+});
+
+base.addEventListener("touchmove",e=>{
+if(!touching)return;
+
+let rect=base.getBoundingClientRect();
 let t=e.touches[0];
-joyX=(t.clientX-80)/50;
-joyY=(t.clientY-80)/50;
+
+let dx=t.clientX-(rect.left+60);
+let dy=t.clientY-(rect.top+60);
+
+let dist=Math.hypot(dx,dy);
+let max=40;
+
+if(dist>max){
+dx=dx/dist*max;
+dy=dy/dist*max;
+}
+
+stick.style.left=(dx+60-30)+"px";
+stick.style.top=(dy+60-30)+"px";
+
+joyX=dx/max;
+joyY=dy/max;
+});
+
+base.addEventListener("touchend",()=>{
+touching=false;
+joyX=0;joyY=0;
+stick.style.left="30px";
+stick.style.top="30px";
 });
 
 /* START */
@@ -84,22 +122,21 @@ game.style.display="block";
 
 player.color=document.getElementById("color").value;
 
-/* joystick mobile */
 if("ontouchstart" in window){
-joystick.style.display="block";
+base.style.display="block";
 }
 
-/* spawn bots */
-for(let i=0;i<10;i++){
+/* bots */
+for(let i=0;i<15;i++){
 bots.push({
 x:Math.random()*4000,
 y:Math.random()*4000,
-size:10+Math.random()*20
+size:10+Math.random()*30
 });
 }
 
 /* comida */
-for(let i=0;i<200;i++){
+for(let i=0;i<300;i++){
 foods.push({x:Math.random()*4000,y:Math.random()*4000});
 }
 }
@@ -107,14 +144,14 @@ foods.push({x:Math.random()*4000,y:Math.random()*4000});
 /* LOOP */
 function loop(){
 
-/* MOVIMENTO */
 let speed=3;
 let dx=0,dy=0;
 
-if(keys["w"]||keys["ArrowUp"]) dy-=1;
-if(keys["s"]||keys["ArrowDown"]) dy+=1;
-if(keys["a"]||keys["ArrowLeft"]) dx-=1;
-if(keys["d"]||keys["ArrowRight"]) dx+=1;
+/* teclado */
+if(keys["w"]||keys["ArrowUp"]) dy--;
+if(keys["s"]||keys["ArrowDown"]) dy++;
+if(keys["a"]||keys["ArrowLeft"]) dx--;
+if(keys["d"]||keys["ArrowRight"]) dx++;
 
 /* mobile */
 dx+=joyX;
@@ -123,45 +160,40 @@ dy+=joyY;
 player.x+=dx*speed;
 player.y+=dy*speed;
 
-/* parede */
+/* morrer borda */
 if(player.x<0||player.y<0||player.x>4000||player.y>4000){
 die();
 }
 
-/* COMER */
+/* comer comida */
 foods.forEach((f,i)=>{
-let d=Math.hypot(f.x-player.x,f.y-player.y);
-if(d<player.size){
+if(Math.hypot(f.x-player.x,f.y-player.y)<player.size){
 foods.splice(i,1);
-player.size+=1;
+player.size+=0.5;
 segments.push({x:player.x,y:player.y});
 }
 });
 
-/* SEGMENTOS */
-segments.unshift({x:player.x,y:player.y});
-segments.splice(player.size);
+/* comer bots */
+bots.forEach((b,i)=>{
+let dist=Math.hypot(b.x-player.x,b.y-player.y);
 
-/* BOTS */
-bots.forEach(b=>{
-let dx=player.x-b.x;
-let dy=player.y-b.y;
-let dist=Math.hypot(dx,dy);
-
-if(b.size<player.size){
-b.x-=dx/dist*1.5;
-b.y-=dy/dist*1.5;
-}else{
-b.x+=dx/dist*1.5;
-b.y+=dy/dist*1.5;
+if(dist<player.size && player.size>b.size){
+player.size+=b.size/2;
+bots.splice(i,1);
 }
 
-if(dist<player.size && b.size>player.size){
+/* morrer pra bot */
+if(dist<b.size && b.size>player.size){
 die();
 }
 });
 
-/* DESENHAR */
+/* segmentos */
+segments.unshift({x:player.x,y:player.y});
+segments.splice(player.size);
+
+/* desenhar */
 game.innerHTML="";
 
 /* comida */
@@ -173,7 +205,7 @@ d.style.top=f.y+"px";
 game.appendChild(d);
 });
 
-/* player corpo */
+/* corpo */
 segments.forEach(s=>{
 let d=document.createElement("div");
 d.className="segment";
@@ -197,13 +229,16 @@ d.style.background="red";
 game.appendChild(d);
 });
 
-/* CAMERA */
-game.style.transform=
-`translate(${-player.x+window.innerWidth/2}px,${-player.y+window.innerHeight/2}px)`;
+/* CAMERA (CORRIGIDA) */
+let zoom = 1.5 - (player.size/100);
+if(zoom<0.6) zoom=0.6;
 
-/* RANKING */
+game.style.transform=
+`translate(${-player.x*zoom+window.innerWidth/2}px,${-player.y*zoom+window.innerHeight/2}px) scale(${zoom})`;
+
+/* ranking */
 let ranking=[...bots,{size:player.size}].sort((a,b)=>b.size-a.size);
-ui.innerText="Top 1: "+ranking[0].size+" | Seu: "+player.size;
+ui.innerText="Top: "+Math.floor(ranking[0].size)+" | Você: "+Math.floor(player.size);
 
 requestAnimationFrame(loop);
 }
