@@ -2,24 +2,29 @@
 <head>
 <meta charset="UTF-8">
 <title>Parasite.io</title><style>
-body{margin:0;overflow:hidden;font-family:Arial;background:#1b5e20;}
+body{margin:0;overflow:hidden;font-family:Arial;background:#1b5e20;color:white;}
 
-#menu{
+#menu,#settings{
 position:absolute;width:100%;height:100%;
 display:flex;flex-direction:column;align-items:center;justify-content:center;
-background:linear-gradient(#1b5e20,#2e7d32);color:white;
+background:linear-gradient(#1b5e20,#2e7d32);
 }
 
-#menu h1{font-size:60px;text-shadow:0 0 20px black;}
+#settings{display:none;}
 
-.menuBox{
+h1{font-size:60px;text-shadow:0 0 20px black;}
+
+.box{
 background:rgba(0,0,0,0.4);
 padding:30px;border-radius:20px;
 box-shadow:0 0 30px black;
 display:flex;flex-direction:column;align-items:center;
 }
 
-input,button{padding:12px;margin:8px;border-radius:10px;border:none;}
+input,button,select{
+padding:12px;margin:8px;border-radius:10px;border:none;
+}
+
 button{background:#00e676;cursor:pointer;}
 
 #game{
@@ -32,7 +37,6 @@ background:repeating-linear-gradient(45deg,#3fa34d,#3fa34d 20px,#45b35a 20px,#45
 .segment{position:absolute;border-radius:50%;}
 .food{position:absolute;width:8px;height:8px;background:yellow;border-radius:50%;}
 
-/* JOYSTICK */
 #joystickBase{
 position:fixed;bottom:50px;left:50px;
 width:240px;height:240px;
@@ -48,15 +52,33 @@ top:60px;left:60px;
 
 #ui{
 position:fixed;top:10px;left:10px;
-color:white;background:rgba(0,0,0,0.5);
+background:rgba(0,0,0,0.5);
 padding:10px;border-radius:10px;
 }
-</style></head><body><div id="menu">
+</style></head><body><!-- MENU --><div id="menu">
 <h1>Parasite.io</h1>
-<div class="menuBox">
+<div class="box">
 <input id="nick" placeholder="Nick">
 <input type="color" id="color" value="#00ff00">
 <button onclick="start()">Jogar</button>
+<button onclick="openSettings()">Settings</button>
+</div>
+</div><!-- SETTINGS --><div id="settings">
+<h1>Settings</h1>
+<div class="box"><label>Controle:</label>
+<select id="controlType">
+
+<option value="wasd">WASD</option>
+<option value="arrows">Setinhas</option>
+<option value="mouse">Mouse</option>
+</select><label>Volume:</label>
+<input type="range" id="volume" min="0" max="100" value="50">
+
+<label>Joystick Size (mobile):</label>
+<input type="range" id="joySize" min="150" max="400" value="240">
+
+<button onclick="closeSettings()">Voltar</button>
+
 </div>
 </div><div id="game"></div><div id="joystickBase">
 <div id="joystickStick"></div>
@@ -64,53 +86,61 @@ padding:10px;border-radius:10px;
 let game=document.getElementById("game");
 let ui=document.getElementById("ui");
 
-let player={x:2000,y:2000,size:12,color:"#00ff00",length:20};
+let player={x:2000,y:2000,size:12,length:20,color:"#0f0"};
 let segments=[];
 let bots=[];
 let foods=[];
 let keys={};
 
+let control="wasd";
+
+/* SETTINGS */
+function openSettings(){
+document.getElementById("menu").style.display="none";
+document.getElementById("settings").style.display="flex";
+}
+
+function closeSettings(){
+document.getElementById("settings").style.display="none";
+document.getElementById("menu").style.display="flex";
+}
+
 /* CONTROLES */
 document.addEventListener("keydown",e=>keys[e.key]=true);
 document.addEventListener("keyup",e=>keys[e.key]=false);
+
+/* MOUSE */
+let mouseX=0,mouseY=0;
+document.addEventListener("mousemove",e=>{
+mouseX=e.clientX;
+mouseY=e.clientY;
+});
 
 /* JOYSTICK */
 let joyX=0,joyY=0;
 let base=document.getElementById("joystickBase");
 let stick=document.getElementById("joystickStick");
-let touching=false;
-
-base.addEventListener("touchstart",()=>touching=true);
 
 base.addEventListener("touchmove",e=>{
-if(!touching)return;
-
 let rect=base.getBoundingClientRect();
 let t=e.touches[0];
 
-let dx=t.clientX-(rect.left+120);
-let dy=t.clientY-(rect.top+120);
+let dx=t.clientX-(rect.left+base.offsetWidth/2);
+let dy=t.clientY-(rect.top+base.offsetHeight/2);
 
+let max=base.offsetWidth/2;
 let dist=Math.hypot(dx,dy);
-let max=90;
 
 if(dist>max){
 dx=dx/dist*max;
 dy=dy/dist*max;
 }
 
-stick.style.left=(dx+60)+"px";
-stick.style.top=(dy+60)+"px";
+stick.style.left=(dx+max-60)+"px";
+stick.style.top=(dy+max-60)+"px";
 
 joyX=dx/max;
 joyY=dy/max;
-});
-
-base.addEventListener("touchend",()=>{
-touching=false;
-joyX=0;joyY=0;
-stick.style.left="60px";
-stick.style.top="60px";
 });
 
 /* START */
@@ -119,21 +149,24 @@ document.getElementById("menu").style.display="none";
 game.style.display="block";
 
 player.color=document.getElementById("color").value;
+control=document.getElementById("controlType").value;
+
+/* joystick size */
+let size=document.getElementById("joySize").value;
+base.style.width=size+"px";
+base.style.height=size+"px";
 
 if("ontouchstart" in window){
 base.style.display="block";
 }
 
-spawnBots(10);
-
-for(let i=0;i<400;i++){
-foods.push({x:Math.random()*4000,y:Math.random()*4000});
-}
+/* spawn */
+for(let i=0;i<10;i++)spawnBot();
+for(let i=0;i<400;i++)foods.push({x:Math.random()*4000,y:Math.random()*4000});
 }
 
-/* SPAWN BOTS */
-function spawnBots(q){
-for(let i=0;i<q;i++){
+/* BOT */
+function spawnBot(){
 bots.push({
 x:Math.random()*4000,
 y:Math.random()*4000,
@@ -142,7 +175,6 @@ length:15,
 segments:[]
 });
 }
-}
 
 /* LOOP */
 function loop(){
@@ -150,14 +182,25 @@ function loop(){
 let speed=3;
 let dx=0,dy=0;
 
-/* CONTROLES */
-if(keys["w"]||keys["ArrowUp"]) dy--;
-if(keys["s"]||keys["ArrowDown"]) dy++;
-if(keys["a"]||keys["ArrowLeft"]) dx--;
-if(keys["d"]||keys["ArrowRight"]) dx++;
+/* CONTROLE */
+if(control==="wasd"){
+if(keys["w"])dy--;
+if(keys["s"])dy++;
+if(keys["a"])dx--;
+if(keys["d"])dx++;
+}
+if(control==="arrows"){
+if(keys["ArrowUp"])dy--;
+if(keys["ArrowDown"])dy++;
+if(keys["ArrowLeft"])dx--;
+if(keys["ArrowRight"])dx++;
+}
+if(control==="mouse"){
+dx=(mouseX-window.innerWidth/2)/100;
+dy=(mouseY-window.innerHeight/2)/100;
+}
 
-dx+=joyX;
-dy+=joyY;
+dx+=joyX;dy+=joyY;
 
 let dist=Math.hypot(dx,dy);
 if(dist>0){dx/=dist;dy/=dist;}
@@ -165,12 +208,10 @@ if(dist>0){dx/=dist;dy/=dist;}
 player.x+=dx*speed;
 player.y+=dy*speed;
 
-/* MORTE BORDA */
-if(player.x<0||player.y<0||player.x>4000||player.y>4000){
-die();
-}
+/* BORDA */
+if(player.x<0||player.y<0||player.x>4000||player.y>4000)die();
 
-/* COMIDA PLAYER */
+/* COMER COMIDA */
 foods.forEach((f,i)=>{
 if(Math.hypot(f.x-player.x,f.y-player.y)<player.size){
 foods.splice(i,1);
@@ -178,17 +219,21 @@ player.length+=2;
 }
 });
 
+/* PLAYER CORPO */
+segments.unshift({x:player.x,y:player.y});
+segments.splice(player.length);
+
 /* BOTS */
 bots.forEach((b,i)=>{
 
-/* IA comida */
+/* comida alvo */
 let target=foods[Math.floor(Math.random()*foods.length)];
 if(target){
 let dx=target.x-b.x;
 let dy=target.y-b.y;
 let d=Math.hypot(dx,dy);
-b.x+=dx/d*1.5;
-b.y+=dy/d*1.5;
+b.x+=dx/d*2;
+b.y+=dy/d*2;
 }
 
 /* comer comida */
@@ -199,33 +244,29 @@ b.length+=2;
 }
 });
 
-/* morte borda */
-if(b.x<0||b.y<0||b.x>4000||b.y>4000){
+/* corpo */
+b.segments.unshift({x:b.x,y:b.y});
+b.segments.splice(b.length);
+
+/* colisão com player */
+let d=Math.hypot(player.x-b.x,player.y-b.y);
+
+if(d<player.size && player.length>b.length){
 bots.splice(i,1);
-spawnBots(2);
+player.length+=5;
+spawnBot();spawnBot();
 }
 
-/* matar player */
-let d=Math.hypot(player.x-b.x,player.y-b.y);
-if(d<b.size && b.size>player.size){
+if(d<b.size && b.length>player.length){
 die();
 }
 
-/* player mata bot */
-if(d<player.size && player.size>b.size){
+/* borda */
+if(b.x<0||b.y<0||b.x>4000||b.y>4000){
 bots.splice(i,1);
-player.length+=5;
-spawnBots(2);
+spawnBot();spawnBot();
 }
-
-/* crescer corpo */
-b.segments.unshift({x:b.x,y:b.y});
-b.segments.splice(b.length);
 });
-
-/* PLAYER CORPO */
-segments.unshift({x:player.x,y:player.y});
-segments.splice(player.length);
 
 /* DESENHAR */
 game.innerHTML="";
@@ -271,8 +312,7 @@ translate(${window.innerWidth/2}px,${window.innerHeight/2}px)
 translate(${-player.x}px,${-player.y}px)
 `;
 
-/* UI */
-ui.innerText="Tamanho: "+player.length+" | Bots: "+bots.length;
+ui.innerText="Tamanho: "+player.length;
 
 requestAnimationFrame(loop);
 }
@@ -284,4 +324,4 @@ location.reload();
 
 loop();
 </script></body>
-  </html>
+</html>
